@@ -21,6 +21,7 @@ type User struct {
 	Name     string
 	Password []byte
 	Regdate  time.Time
+	Admin    bool
 }
 
 type Thread struct {
@@ -181,11 +182,33 @@ func (client *limbo) BoardList(cmd *bbs.ListCommand) (blm *bbs.BoardListMessage,
 }
 
 func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
-	return nil, &bbs.ErrorMessage{
-		Command: "error",
-		ReplyTo: "reply",
-		Error:   "Not implemented yet, sorry!",
+	if !bson.IsObjectIdHex(cmd.To) {
+		return nil, bbs.Error("reply", "Invalid thread ID.")
 	}
+	id := bson.ObjectIdHex(cmd.To)
+	var thread Thread
+	err := db.C("threads").FindId(id).One(&thread)
+	if err != nil {
+		return nil, bbs.Error("reply", "No such thread.")
+	}
+
+	if thread.Closed && !client.user.Admin {
+		return nil, bbs.Error("reply", "Can't reply to a closed thread.")
+	}
+
+	// TODO: deal with formatting
+	post := Post{
+		Author: client.user.Name,
+		Date:   time.Now(),
+		Text:   cmd.Text,
+	}
+
+	err = db.C("threads").UpdateId(id, bson.M{"$push": bson.M{"posts": &post}})
+	if err != nil {
+		return nil, bbs.Error("reply", "DB error: couldn't add reply.")
+	}
+
+	return bbs.OK("reply"), nil
 }
 
 func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
