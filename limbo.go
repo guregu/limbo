@@ -152,9 +152,9 @@ func (client *limbo) IsLoggedIn() bool {
 func (client *limbo) Hello() bbs.HelloMessage {
 	return bbs.HelloMessage{
 		Command:         "hello",
-		Name:            config.Board.Name,
+		Name:            config.BBS.Name,
 		ProtocolVersion: 0,
-		Description:     config.Board.Desc,
+		Description:     config.BBS.Desc,
 		Options:         []string{"filter", "range", "tags"},
 		Access: bbs.AccessInfo{
 			GuestCommands: []string{"hello", "login", "logout", "register"},

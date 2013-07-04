@@ -2,7 +2,7 @@
 bind = "localhost:8080"
 path = "/bbs"
 
-[board]
+[bbs]
 name = "Limbo Test Board"
 desc = "\"next-generation bbs\""
 

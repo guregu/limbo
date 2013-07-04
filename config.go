@@ -7,7 +7,7 @@ var configFile = "config.toml"
 
 type Config struct {
 	Server ServerConfig `toml:"server"`
-	Board  BoardConfig  `toml:"board"`
+	BBS    BoardConfig  `toml:"bbs"`
 	DB     DBConfig     `toml:"database"`
 }
 
