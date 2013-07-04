@@ -1,6 +1,6 @@
 package main
 
-import _ "fmt"
+import "fmt"
 import "time"
 import "log"
 import "strings"
@@ -33,8 +33,7 @@ type Thread struct {
 }
 
 type Post struct {
-	Name   string
-	Author *User
+	Author string
 	Date   time.Time
 	Text   string
 }
@@ -105,12 +104,61 @@ func (client *limbo) LogOut(cmd *bbs.LogoutCommand) *bbs.OKMessage {
 	}
 }
 
-func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.ErrorMessage) {
-	return nil, &bbs.ErrorMessage{
-		Command: "error",
-		ReplyTo: "get",
-		Error:   "Not implemented yet, sorry!",
+func messages(thread *Thread, r *bbs.Range) []*bbs.Message {
+	var msgs []*bbs.Message
+	for i, v := range thread.Posts {
+		if r != nil {
+			if i+1 < r.Start {
+				continue
+			} else if i+1 > r.End {
+				break
+			}
+		}
+		msgs = append(msgs, &bbs.Message{
+			ID:     fmt.Sprintf("%s:%d", thread.ID.Hex(), i+1),
+			Author: v.Author,
+			Date:   v.Date.String(),
+			Text:   v.Text,
+		})
 	}
+	return msgs
+}
+
+func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.ErrorMessage) {
+	// Possible improvement: use a prettier Thread ID (base64 instead of hex?)
+	if !bson.IsObjectIdHex(cmd.ThreadID) {
+		return nil, bbs.Error("get", "Invalid thread ID.")
+	}
+
+	id := bson.ObjectIdHex(cmd.ThreadID)
+	var thread Thread
+	err := db.C("threads").FindId(id).One(&thread)
+	if err != nil {
+		return nil, bbs.Error("get", fmt.Sprintf("No such thread: %s", cmd.ThreadID))
+	}
+
+	return &bbs.ThreadMessage{
+		Command:  "msg",
+		ID:       cmd.ThreadID,
+		Title:    thread.Title,
+		Format:   "markdown",
+		Messages: messages(&thread, cmd.Range),
+	}, nil
+}
+
+func listing(threads []*Thread) []*bbs.ThreadListing {
+	var list []*bbs.ThreadListing
+	for _, t := range threads {
+		list = append(list, &bbs.ThreadListing{
+			ID:        t.ID.Hex(),
+			Title:     t.Title,
+			Author:    t.Creator,
+			Date:      t.Created.String(),
+			PostCount: len(t.Posts),
+			Tags:      t.Tags,
+		})
+	}
+	return list
 }
 
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
@@ -120,7 +168,7 @@ func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.
 		Command: "list",
 		Type:    "thread",
 		Query:   cmd.Query,
-		Threads: threads,
+		Threads: listing(threads),
 	}, nil
 }
 
