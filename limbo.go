@@ -3,6 +3,7 @@ package main
 import _ "fmt"
 import "time"
 import "log"
+import "strings"
 
 import "code.google.com/p/go.crypto/bcrypt"
 import "labix.org/v2/mgo"
@@ -13,10 +14,13 @@ var db *mgo.Database
 var dbSession *mgo.Session
 var config *Config
 
+var usernameLengthLimit = 32
+
 type User struct {
-	ID       bson.ObjectId `bson:"_id,omitempty"`
+	ID       string `bson:"_id,omitempty"` // username lower-cased
 	Name     string
 	Password []byte
+	Regdate  time.Time
 }
 
 type Thread struct {
@@ -37,6 +41,43 @@ type Post struct {
 
 type limbo struct {
 	user *User
+}
+
+// TODO: add options for no spaces, etc
+func validateUsername(username string) bool {
+	length := len(username)
+	if length == 0 || length > usernameLengthLimit {
+		return false
+	}
+	return true
+}
+
+func (client *limbo) Register(cmd *bbs.RegisterCommand) (wm *bbs.OKMessage, errm *bbs.ErrorMessage) {
+	if !validateUsername(cmd.Username) {
+		return nil, bbs.Error("register", "Invalid username.")
+	}
+
+	// see if we have a user already
+	ct, err := db.C("users").FindId(strings.ToLower(cmd.Username)).Count()
+	if err != nil || ct == 0 {
+		pw, crypt_err := bcrypt.GenerateFromPassword([]byte(cmd.Password), bcrypt.DefaultCost)
+		if crypt_err != nil {
+			// seems like bcrypt freaks out if the password is less than 3 characters
+			return nil, bbs.Error("register", "Password too short.")
+		}
+
+		usr := User{
+			ID:       strings.ToLower(cmd.Username),
+			Name:     cmd.Username,
+			Password: pw,
+			Regdate:  time.Now(),
+		}
+
+		db.C("users").Insert(&usr)
+		return bbs.OK("register"), nil
+	} else {
+		return nil, bbs.Error("register", "Username is already taken.")
+	}
 }
 
 // TODO: change bbs package so this can return an error message
@@ -116,7 +157,7 @@ func (client *limbo) Hello() bbs.HelloMessage {
 		Description:     config.Board.Desc,
 		Options:         []string{"filter", "range", "tags"},
 		Access: bbs.AccessInfo{
-			GuestCommands: []string{"hello", "login", "logout"},
+			GuestCommands: []string{"hello", "login", "logout", "register"},
 			UserCommands:  []string{"get", "list", "post", "reply", "info"},
 		},
 		Formats:       []string{"html", "text"},
