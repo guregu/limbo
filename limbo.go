@@ -30,6 +30,8 @@ type Thread struct {
 	Created time.Time
 	Posts   []*Post
 	Tags    []string
+	Sticky  bool
+	Closed  bool
 }
 
 type Post struct {
@@ -156,6 +158,8 @@ func listing(threads []*Thread) []*bbs.ThreadListing {
 			Date:      t.Created.String(),
 			PostCount: len(t.Posts),
 			Tags:      t.Tags,
+			Sticky:    t.Sticky,
+			Closed:    t.Closed,
 		})
 	}
 	return list
@@ -173,11 +177,7 @@ func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.
 }
 
 func (client *limbo) BoardList(cmd *bbs.ListCommand) (blm *bbs.BoardListMessage, errm *bbs.ErrorMessage) {
-	return nil, &bbs.ErrorMessage{
-		Command: "error",
-		ReplyTo: "list",
-		Error:   "No boards!",
-	}
+	return nil, bbs.Error("list", "No boards!")
 }
 
 func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
@@ -189,10 +189,38 @@ func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs
 }
 
 func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
-	return nil, &bbs.ErrorMessage{
-		Command: "error",
-		ReplyTo: "post",
-		Error:   "Not implemented yet, sorry!",
+	if cmd.Title == "" {
+		return nil, bbs.Error("post", "Thread title can't be blank.")
+	}
+
+	// TODO: deal with formatting, tags
+	id := bson.NewObjectId()
+	now := time.Now()
+	thread := Thread{
+		ID:      id,
+		Title:   cmd.Title,
+		Created: now,
+		Creator: client.user.Name,
+		Tags:    cmd.Tags,
+		Posts: []*Post{
+			&Post{
+				Author: client.user.Name,
+				Date:   now,
+				Text:   cmd.Text,
+			},
+		},
+	}
+
+	err := db.C("threads").Insert(&thread)
+	if err != nil {
+		return &bbs.OKMessage{
+			Command: "ok",
+			ReplyTo: "post",
+			Result:  id.Hex(),
+		}, nil
+	} else {
+		log.Printf("New thread err: %s\n", err.Error())
+		return nil, bbs.Error("post", "Couldn't post.")
 	}
 }
 
@@ -208,8 +236,8 @@ func (client *limbo) Hello() bbs.HelloMessage {
 		Description:     config.BBS.Desc,
 		Options:         []string{"filter", "range", "tags"},
 		Access: bbs.AccessInfo{
-			GuestCommands: []string{"hello", "login", "logout", "register"},
-			UserCommands:  []string{"get", "list", "post", "reply", "info"},
+			GuestCommands: []string{"hello", "login", "logout", "register", "get", "list"},
+			UserCommands:  []string{"post", "reply", "info"},
 		},
 		Formats:       []string{"html", "text"},
 		Lists:         []string{"thread"},
