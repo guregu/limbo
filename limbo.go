@@ -17,7 +17,7 @@ var config *Config
 var usernameLengthLimit = 32
 
 type User struct {
-	ID       string `bson:"_id,omitempty"` // username lower-cased
+	ID       string `bson:"_id"` // username lower-cased
 	Name     string
 	Password []byte
 	Regdate  time.Time
