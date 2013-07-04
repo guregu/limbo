@@ -26,7 +26,7 @@ type User struct {
 type Thread struct {
 	ID      bson.ObjectId `bson:"_id,omitempty"`
 	Title   string
-	Creator *User
+	Creator string
 	Created time.Time
 	Posts   []*Post
 	Tags    []string
@@ -114,25 +114,28 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 }
 
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
-	return nil, &bbs.ErrorMessage{
-		Command: "error",
-		ReplyTo: "get",
-		Error:   "Not implemented yet, sorry!",
-	}
+	var threads []*Thread
+	db.C("threads").Find(bson.M{}).Limit(50).All(&threads)
+	return &bbs.ListMessage{
+		Command: "list",
+		Type:    "thread",
+		Query:   cmd.Query,
+		Threads: threads,
+	}, nil
 }
 
 func (client *limbo) BoardList(cmd *bbs.ListCommand) (blm *bbs.BoardListMessage, errm *bbs.ErrorMessage) {
 	return nil, &bbs.ErrorMessage{
 		Command: "error",
-		ReplyTo: "get",
-		Error:   "Not implemented yet, sorry!",
+		ReplyTo: "list",
+		Error:   "No boards!",
 	}
 }
 
 func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
 	return nil, &bbs.ErrorMessage{
 		Command: "error",
-		ReplyTo: "get",
+		ReplyTo: "reply",
 		Error:   "Not implemented yet, sorry!",
 	}
 }
@@ -140,7 +143,7 @@ func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs
 func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
 	return nil, &bbs.ErrorMessage{
 		Command: "error",
-		ReplyTo: "get",
+		ReplyTo: "post",
 		Error:   "Not implemented yet, sorry!",
 	}
 }
