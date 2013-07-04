@@ -1,0 +1,11 @@
+[server]
+bind = "localhost:8080"
+path = "/bbs"
+
+[board]
+name = "Limbo Test Board"
+desc = "\"next-generation bbs\""
+
+[database]
+addr = "localhost" # uses default mongodb port
+name = "limbo"
