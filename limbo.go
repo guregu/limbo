@@ -12,7 +12,7 @@ import "github.com/guregu/bbs"
 
 var db *mgo.Database
 var dbSession *mgo.Session
-var config *Config
+var config Config
 
 var usernameLengthLimit = 32
 var defaultRange = &bbs.Range{1, 50}
@@ -77,13 +77,11 @@ func (client *limbo) LogIn(cmd *bbs.LoginCommand) bool {
 }
 
 func (client *limbo) LogOut(cmd *bbs.LogoutCommand) *bbs.OKMessage {
-	// TODO: session handling
 	client.user = nil
 	return bbs.OK("logout")
 }
 
 func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.ErrorMessage) {
-	// Possible improvement: use a prettier Thread ID (base64 instead of hex?)
 	if !bson.IsObjectIdHex(cmd.ThreadID) {
 		return nil, bbs.Error("get", "Invalid thread ID.")
 	}
@@ -246,8 +244,7 @@ func New() bbs.BBS {
 }
 
 func main() {
-	var cfg = readConfig()
-	config = &cfg
+	config = readConfig()
 
 	dbSesh, err := mgo.Dial(config.DB.Addr)
 	if err != nil {
@@ -267,5 +264,5 @@ func main() {
 		log.Fatalf("Couldn't make index: %s\n", err.Error())
 	}
 
-	bbs.Serve(config.Server.Bind, cfg.Server.Path, New)
+	bbs.Serve(config.Server.Bind, config.Server.Path, New)
 }
