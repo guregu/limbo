@@ -166,14 +166,11 @@ func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs
 		Text:   cmd.Text,
 	}
 
-	err = db.C("threads").UpdateId(id, bson.M{"$push": bson.M{"posts": &post}})
+	err = db.C("threads").UpdateId(id, bson.M{
+		"$push": bson.M{"posts": &post},
+		"$set":  bson.M{"lastpost": time.Now()}})
 	if err != nil {
 		return nil, bbs.Error("reply", "DB error: couldn't add reply.")
-	}
-
-	err = db.C("threads").UpdateId(thread.ID, bson.M{"$set": bson.M{"lastpost": time.Now()}})
-	if err != nil {
-		return nil, bbs.Error("reply", "DB error: couldn't set last post date.")
 	}
 
 	return bbs.OK("reply"), nil
