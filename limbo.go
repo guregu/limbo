@@ -102,7 +102,6 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 	return thread.toBBS(cmd.Range), nil
 }
 
-// TODO: support for next token
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
 	var date = time.Now().Add(time.Second * 5)
 	if cmd.Token != "" {
@@ -112,13 +111,13 @@ func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.
 		}
 	}
 
+	// TODO: use $slice with cmd.Range
 	var threads Threads
 	if cmd.Query == "" {
 		db.C("threads").Find(bson.M{
 			"lastpost": bson.M{
 				"$lt": date,
-			},
-		}).Sort("-lastpost").Limit(listThreadLimit).All(&threads)
+			}}).Sort("-lastpost").Limit(listThreadLimit).All(&threads)
 	} else {
 		tags := parseTagExpr(cmd.Query)
 		db.C("threads").Find(bson.M{
@@ -256,6 +255,17 @@ func main() {
 	}
 	dbSession = dbSesh
 	db = dbSession.DB(config.DB.Name)
+	lpIndex := mgo.Index{
+		Key:        []string{"-lastpost"},
+		Unique:     false,
+		DropDups:   false,
+		Background: true,
+		Sparse:     true,
+	}
+	err = db.C("threads").EnsureIndex(lpIndex)
+	if err != nil {
+		log.Fatalf("Couldn't make index: %s\n", err.Error())
+	}
 
 	bbs.Serve(config.Server.Bind, cfg.Server.Path, New)
 }
