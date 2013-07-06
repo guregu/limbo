@@ -35,6 +35,49 @@ type Thread struct {
 	Closed  bool
 }
 
+func (thread Thread) listing() *bbs.ThreadListing {
+	return &bbs.ThreadListing{
+		ID:        thread.ID.Hex(),
+		Title:     thread.Title,
+		Author:    thread.Creator,
+		Date:      thread.Created.String(),
+		PostCount: len(thread.Posts),
+		Tags:      thread.Tags,
+		Sticky:    thread.Sticky,
+		Closed:    thread.Closed,
+	}
+}
+
+func (thread Thread) messages(r *bbs.Range) []*bbs.Message {
+	var msgs []*bbs.Message
+	for i, v := range thread.Posts {
+		if r != nil {
+			if i+1 < r.Start {
+				continue
+			} else if i+1 > r.End {
+				break
+			}
+		}
+		msgs = append(msgs, &bbs.Message{
+			ID:     fmt.Sprintf("%s:%d", thread.ID.Hex(), i+1),
+			Author: v.Author,
+			Date:   v.Date.String(),
+			Text:   v.Text,
+		})
+	}
+	return msgs
+}
+
+type Threads []*Thread
+
+func (threads Threads) listing() []*bbs.ThreadListing {
+	var list []*bbs.ThreadListing
+	for _, t := range threads {
+		list = append(list, t.listing())
+	}
+	return list
+}
+
 type Post struct {
 	Author string
 	Date   time.Time
@@ -107,26 +150,6 @@ func (client *limbo) LogOut(cmd *bbs.LogoutCommand) *bbs.OKMessage {
 	}
 }
 
-func messages(thread *Thread, r *bbs.Range) []*bbs.Message {
-	var msgs []*bbs.Message
-	for i, v := range thread.Posts {
-		if r != nil {
-			if i+1 < r.Start {
-				continue
-			} else if i+1 > r.End {
-				break
-			}
-		}
-		msgs = append(msgs, &bbs.Message{
-			ID:     fmt.Sprintf("%s:%d", thread.ID.Hex(), i+1),
-			Author: v.Author,
-			Date:   v.Date.String(),
-			Text:   v.Text,
-		})
-	}
-	return msgs
-}
-
 func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.ErrorMessage) {
 	// Possible improvement: use a prettier Thread ID (base64 instead of hex?)
 	if !bson.IsObjectIdHex(cmd.ThreadID) {
@@ -145,35 +168,18 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 		ID:       cmd.ThreadID,
 		Title:    thread.Title,
 		Format:   "markdown",
-		Messages: messages(&thread, cmd.Range),
+		Messages: thread.messages(cmd.Range),
 	}, nil
 }
 
-func listing(threads []*Thread) []*bbs.ThreadListing {
-	var list []*bbs.ThreadListing
-	for _, t := range threads {
-		list = append(list, &bbs.ThreadListing{
-			ID:        t.ID.Hex(),
-			Title:     t.Title,
-			Author:    t.Creator,
-			Date:      t.Created.String(),
-			PostCount: len(t.Posts),
-			Tags:      t.Tags,
-			Sticky:    t.Sticky,
-			Closed:    t.Closed,
-		})
-	}
-	return list
-}
-
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
-	var threads []*Thread
+	var threads Threads
 	db.C("threads").Find(bson.M{}).Limit(50).All(&threads)
 	return &bbs.ListMessage{
 		Command: "list",
 		Type:    "thread",
 		Query:   cmd.Query,
-		Threads: listing(threads),
+		Threads: threads.listing(),
 	}, nil
 }
 
@@ -235,7 +241,7 @@ func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.E
 	}
 
 	err := db.C("threads").Insert(&thread)
-	if err != nil {
+	if err == nil {
 		return &bbs.OKMessage{
 			Command: "ok",
 			ReplyTo: "post",
