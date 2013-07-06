@@ -16,6 +16,7 @@ var config *Config
 
 var usernameLengthLimit = 32
 var defaultRange = &bbs.Range{1, 50}
+var listThreadLimit = 50
 
 type limbo struct {
 	user *User
@@ -103,23 +104,43 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 
 // TODO: support for next token
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
+	var date = time.Now().Add(time.Second * 5)
+	if cmd.Token != "" {
+		d, err := time.Parse(time.RFC3339, cmd.Token)
+		if err == nil {
+			date = d
+		}
+	}
+
 	var threads Threads
 	if cmd.Query == "" {
-		db.C("threads").Find(bson.M{}).Limit(50).Sort("-lastpost").All(&threads)
+		db.C("threads").Find(bson.M{
+			"lastpost": bson.M{
+				"$lt": date,
+			},
+		}).Sort("-lastpost").Limit(listThreadLimit).All(&threads)
 	} else {
 		tags := parseTagExpr(cmd.Query)
 		db.C("threads").Find(bson.M{
+			"lastpost": bson.M{
+				"$lt": date,
+			},
 			"tags": bson.M{
 				"$in":  tags.include,
 				"$nin": tags.exclude,
-			}}).Limit(50).Sort("-lastpost").All(&threads)
+			}}).Sort("-lastpost").Limit(listThreadLimit).All(&threads)
 	}
-	return &bbs.ListMessage{
+	msg := &bbs.ListMessage{
 		Command: "list",
 		Type:    "thread",
 		Query:   cmd.Query,
 		Threads: threads.listing(),
-	}, nil
+	}
+	// are there more threads? TODO: make sure there really are more?
+	if len(threads) == listThreadLimit {
+		msg.NextToken = threads[listThreadLimit-1].LastPost.Format(time.RFC3339)
+	}
+	return msg, nil
 }
 
 func (client *limbo) BoardList(cmd *bbs.ListCommand) (blm *bbs.BoardListMessage, errm *bbs.ErrorMessage) {
