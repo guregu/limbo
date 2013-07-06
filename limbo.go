@@ -16,74 +16,6 @@ var config *Config
 
 var usernameLengthLimit = 32
 
-type User struct {
-	ID       string `bson:"_id"` // username lower-cased
-	Name     string
-	Password []byte
-	Regdate  time.Time
-	Admin    bool
-}
-
-type Thread struct {
-	ID      bson.ObjectId `bson:"_id,omitempty"`
-	Title   string
-	Creator string
-	Created time.Time
-	Posts   []*Post
-	Tags    []string
-	Sticky  bool
-	Closed  bool
-}
-
-func (thread Thread) listing() *bbs.ThreadListing {
-	return &bbs.ThreadListing{
-		ID:        thread.ID.Hex(),
-		Title:     thread.Title,
-		Author:    thread.Creator,
-		Date:      thread.Created.String(),
-		PostCount: len(thread.Posts),
-		Tags:      thread.Tags,
-		Sticky:    thread.Sticky,
-		Closed:    thread.Closed,
-	}
-}
-
-func (thread Thread) messages(r *bbs.Range) []*bbs.Message {
-	var msgs []*bbs.Message
-	for i, v := range thread.Posts {
-		if r != nil {
-			if i+1 < r.Start {
-				continue
-			} else if i+1 > r.End {
-				break
-			}
-		}
-		msgs = append(msgs, &bbs.Message{
-			ID:     fmt.Sprintf("%s:%d", thread.ID.Hex(), i+1),
-			Author: v.Author,
-			Date:   v.Date.String(),
-			Text:   v.Text,
-		})
-	}
-	return msgs
-}
-
-type Threads []*Thread
-
-func (threads Threads) listing() []*bbs.ThreadListing {
-	var list []*bbs.ThreadListing
-	for _, t := range threads {
-		list = append(list, t.listing())
-	}
-	return list
-}
-
-type Post struct {
-	Author string
-	Date   time.Time
-	Text   string
-}
-
 type limbo struct {
 	user *User
 }
@@ -145,9 +77,7 @@ func (client *limbo) LogIn(cmd *bbs.LoginCommand) bool {
 func (client *limbo) LogOut(cmd *bbs.LogoutCommand) *bbs.OKMessage {
 	// TODO: session handling
 	client.user = nil
-	return &bbs.OKMessage{
-		Command: "ok",
-	}
+	return bbs.OK("logout")
 }
 
 func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.ErrorMessage) {
@@ -163,13 +93,7 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 		return nil, bbs.Error("get", fmt.Sprintf("No such thread: %s", cmd.ThreadID))
 	}
 
-	return &bbs.ThreadMessage{
-		Command:  "msg",
-		ID:       cmd.ThreadID,
-		Title:    thread.Title,
-		Format:   "markdown",
-		Messages: thread.messages(cmd.Range),
-	}, nil
+	return thread.toBBS(cmd.Range), nil
 }
 
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
