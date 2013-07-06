@@ -136,3 +136,41 @@ type Post struct {
 	Date   time.Time
 	Text   string
 }
+
+type query struct {
+	include []string
+	exclude []string
+}
+
+func parseTagExpr(expr string) query {
+	last := ' '
+	str := ""
+	q := query{}
+	for _, r := range expr {
+		if r == '+' || r == '-' {
+			switch last {
+			case ' ':
+				fallthrough
+			case '+':
+				q.include = append(q.include, str)
+			case '-':
+				q.exclude = append(q.exclude, str)
+			}
+			last = r
+			str = ""
+		} else {
+			str = str + string(r)
+		}
+	}
+	if str != "" {
+		switch last {
+		case ' ':
+			fallthrough
+		case '+':
+			q.include = append(q.include, str)
+		case '-':
+			q.exclude = append(q.exclude, str)
+		}
+	}
+	return q
+}

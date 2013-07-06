@@ -96,7 +96,6 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 
 	if cmd.Range == nil && cmd.NextToken != "" {
 		cmd.Range = thread.parseNextToken(cmd.NextToken)
-		log.Printf("New range: %#v", cmd.Range)
 	}
 
 	return thread.toBBS(cmd.Range), nil
@@ -104,7 +103,16 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
 	var threads Threads
-	db.C("threads").Find(bson.M{}).Limit(50).All(&threads)
+	if cmd.Query == "" {
+		db.C("threads").Find(bson.M{}).Limit(50).All(&threads)
+	} else {
+		tags := parseTagExpr(cmd.Query)
+		db.C("threads").Find(bson.M{
+			"tags": bson.M{
+				"$in":  tags.include,
+				"$nin": tags.exclude,
+			}}).Limit(50).All(&threads)
+	}
 	return &bbs.ListMessage{
 		Command: "list",
 		Type:    "thread",
@@ -202,8 +210,12 @@ func (client *limbo) Hello() bbs.HelloMessage {
 		Lists:         []string{"thread"},
 		ServerVersion: "limbo 0.1",
 		IconURL:       "/static/icon.png",
-		DefaultRange:  &bbs.Range{1, 50},
+		DefaultRange:  defaultRange,
 	}
+}
+
+func New() bbs.BBS {
+	return new(limbo)
 }
 
 func main() {
@@ -217,7 +229,5 @@ func main() {
 	dbSession = dbSesh
 	db = dbSession.DB(config.DB.Name)
 
-	bbs.Serve(config.Server.Bind, cfg.Server.Path, func() bbs.BBS {
-		return new(limbo)
-	})
+	bbs.Serve(config.Server.Bind, cfg.Server.Path, New)
 }
