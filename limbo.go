@@ -15,6 +15,7 @@ var dbSession *mgo.Session
 var config *Config
 
 var usernameLengthLimit = 32
+var defaultRange = &bbs.Range{1, 50}
 
 type limbo struct {
 	user *User
@@ -91,6 +92,11 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 	err := db.C("threads").FindId(id).One(&thread)
 	if err != nil {
 		return nil, bbs.Error("get", fmt.Sprintf("No such thread: %s", cmd.ThreadID))
+	}
+
+	if cmd.Range == nil && cmd.NextToken != "" {
+		cmd.Range = thread.parseNextToken(cmd.NextToken)
+		log.Printf("New range: %#v", cmd.Range)
 	}
 
 	return thread.toBBS(cmd.Range), nil

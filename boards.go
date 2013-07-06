@@ -2,6 +2,8 @@ package main
 
 import "fmt"
 import "time"
+import "strings"
+import "strconv"
 import "labix.org/v2/mgo/bson"
 import "github.com/guregu/bbs"
 
@@ -92,6 +94,31 @@ func (thread Thread) messages(r *bbs.Range) []*bbs.Message {
 		})
 	}
 	return msgs
+}
+
+func (thread Thread) parseNextToken(token string) *bbs.Range {
+	split := strings.Split(token, "-")
+	fmt.Printf("%#v", split)
+	if len(split) != 2 {
+		return defaultRange
+	}
+	start, err := strconv.Atoi(split[0])
+	if err != nil {
+		return defaultRange
+	}
+	if split[1] == "" {
+		postcount := len(thread.Posts)
+		if defaultRange.End+start > postcount {
+			return &bbs.Range{start, len(thread.Posts)}
+		} else {
+			return &bbs.Range{start, start + defaultRange.End}
+		}
+	}
+	end, err := strconv.Atoi(split[1])
+	if err != nil {
+		return defaultRange
+	}
+	return &bbs.Range{start, end}
 }
 
 type Threads []*Thread
