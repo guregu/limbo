@@ -101,17 +101,18 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 	return thread.toBBS(cmd.Range), nil
 }
 
+// TODO: support for next token
 func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
 	var threads Threads
 	if cmd.Query == "" {
-		db.C("threads").Find(bson.M{}).Limit(50).All(&threads)
+		db.C("threads").Find(bson.M{}).Limit(50).Sort("-lastpost").All(&threads)
 	} else {
 		tags := parseTagExpr(cmd.Query)
 		db.C("threads").Find(bson.M{
 			"tags": bson.M{
 				"$in":  tags.include,
 				"$nin": tags.exclude,
-			}}).Limit(50).All(&threads)
+			}}).Limit(50).Sort("-lastpost").All(&threads)
 	}
 	return &bbs.ListMessage{
 		Command: "list",
@@ -152,6 +153,11 @@ func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs
 		return nil, bbs.Error("reply", "DB error: couldn't add reply.")
 	}
 
+	err = db.C("threads").UpdateId(thread.ID, bson.M{"$set": bson.M{"lastpost": time.Now()}})
+	if err != nil {
+		return nil, bbs.Error("reply", "DB error: couldn't set last post date.")
+	}
+
 	return bbs.OK("reply"), nil
 }
 
@@ -164,11 +170,12 @@ func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.E
 	id := bson.NewObjectId()
 	now := time.Now()
 	thread := Thread{
-		ID:      id,
-		Title:   cmd.Title,
-		Created: now,
-		Creator: client.user.Name,
-		Tags:    cmd.Tags,
+		ID:       id,
+		Title:    cmd.Title,
+		Created:  now,
+		LastPost: now,
+		Creator:  client.user.Name,
+		Tags:     cmd.Tags,
 		Posts: []*Post{
 			&Post{
 				Author: client.user.Name,

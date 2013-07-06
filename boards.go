@@ -16,14 +16,15 @@ type User struct {
 }
 
 type Thread struct {
-	ID      bson.ObjectId `bson:"_id,omitempty"`
-	Title   string
-	Creator string
-	Created time.Time
-	Posts   []*Post
-	Tags    []string
-	Sticky  bool
-	Closed  bool
+	ID       bson.ObjectId `bson:"_id,omitempty"`
+	Title    string
+	Creator  string
+	Created  time.Time
+	LastPost time.Time
+	Posts    []*Post
+	Tags     []string
+	Sticky   bool
+	Closed   bool
 }
 
 func (thread Thread) toBBS(r *bbs.Range) *bbs.ThreadMessage {
@@ -68,7 +69,7 @@ func (thread Thread) listing() *bbs.ThreadListing {
 		ID:        thread.threadID(),
 		Title:     thread.Title,
 		Author:    thread.Creator,
-		Date:      thread.Created.Format(time.RFC3339),
+		Date:      thread.LastPost.Format(time.RFC3339),
 		PostCount: len(thread.Posts),
 		Tags:      thread.Tags,
 		Sticky:    thread.Sticky,
