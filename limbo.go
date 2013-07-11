@@ -261,5 +261,11 @@ func main() {
 		log.Fatalf("Couldn't make index: %s\n", err.Error())
 	}
 
-	bbs.Serve(config.Server.Bind, config.Server.Path, New)
+	//bbs.Serve(config.Server.Bind, config.Server.Path, New)
+
+	_, tagMap := loadTags()
+	for _, t := range children(tagMap, "poodles") {
+		fmt.Println(t)
+	}
+	//fmt.Printf("%v\n", children(tagMap["animals"]))
 }
