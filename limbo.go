@@ -217,6 +217,10 @@ func (client *limbo) IsLoggedIn() bool {
 	return client.user != nil
 }
 
+func (client *limbo) BookmarkList(m *bbs.ListCommand) (bmm *bbs.BookmarkListMessage, errm *bbs.ErrorMessage) {
+	return nil, bbs.Error("list", "No bookmarks")
+}
+
 func (client *limbo) Hello() bbs.HelloMessage {
 	return bbs.HelloMessage{
 		Command:         "hello",
