@@ -93,8 +93,8 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 		return nil, bbs.Error("get", fmt.Sprintf("No such thread: %s", cmd.ThreadID))
 	}
 
-	if cmd.Range == nil && cmd.NextToken != "" {
-		cmd.Range = thread.parseNextToken(cmd.NextToken)
+	if cmd.Range == nil && cmd.Token != "" {
+		cmd.Range = thread.parseNextToken(cmd.Token)
 	}
 
 	return thread.toBBS(cmd.Range), nil
