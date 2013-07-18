@@ -93,8 +93,8 @@ func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.
 		return nil, bbs.Error("get", fmt.Sprintf("No such thread: %s", cmd.ThreadID))
 	}
 
-	if cmd.Range == nil && cmd.NextToken != "" {
-		cmd.Range = thread.parseNextToken(cmd.NextToken)
+	if cmd.Range == nil && cmd.Token != "" {
+		cmd.Range = thread.parseNextToken(cmd.Token)
 	}
 
 	return thread.toBBS(cmd.Range), nil
@@ -215,6 +215,10 @@ func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.E
 
 func (client *limbo) IsLoggedIn() bool {
 	return client.user != nil
+}
+
+func (client *limbo) BookmarkList(m *bbs.ListCommand) (bmm *bbs.BookmarkListMessage, errm *bbs.ErrorMessage) {
+	return nil, bbs.Error("list", "No bookmarks")
 }
 
 func (client *limbo) Hello() bbs.HelloMessage {

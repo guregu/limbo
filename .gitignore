@@ -20,3 +20,15 @@ _cgo_export.*
 _testmain.go
 
 *.exe
+
+static
+
+limbo
+
+index.html
+
+.DS_Store
+
+config.toml
+
+config.toml
