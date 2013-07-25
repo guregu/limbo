@@ -4,6 +4,8 @@ import "fmt"
 import "time"
 import "log"
 import "strings"
+import "net/http"
+import "io/ioutil"
 
 import "code.google.com/p/go.crypto/bcrypt"
 import "labix.org/v2/mgo"
@@ -13,6 +15,7 @@ import "github.com/guregu/bbs"
 var db *mgo.Database
 var dbSession *mgo.Session
 var config Config
+var server *bbs.Server
 
 var usernameLengthLimit = 32
 var defaultRange = &bbs.Range{1, 50}
@@ -244,6 +247,16 @@ func New() bbs.BBS {
 	return new(limbo)
 }
 
+func index(w http.ResponseWriter, r *http.Request) {
+	// TODO: change to io.Copy?
+	f, err := ioutil.ReadFile(config.WebClient.Index)
+	if err == nil {
+		w.Write(f)
+	} else {
+		http.NotFound(w, r)
+	}
+}
+
 func main() {
 	config = readConfig()
 
@@ -265,12 +278,20 @@ func main() {
 		log.Fatalf("Couldn't make index: %s\n", err.Error())
 	}
 
-	bbs.Serve(config.Server.Bind, config.Server.Path, New)
-	/*
-		_, tagMap := loadTags()
-		for _, t := range children(tagMap, "poodles") {
-			fmt.Println(t)
-		}
-		//fmt.Printf("%v\n", children(tagMap["animals"]))
-	*/
+	log.Printf("Starting limbo (%s) at %s%s\n", config.BBS.Name, config.Server.Bind, config.Server.Path)
+
+	server = bbs.NewServer(New)
+	if config.WebClient.Index != "" {
+		http.HandleFunc("/", index)
+		log.Printf("\t/ \t\t%s", config.WebClient.Index)
+	}
+	if config.WebClient.Static != "" {
+		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(config.WebClient.Static))))
+		log.Printf("\t/static/ \t%s", config.WebClient.Static)
+	}
+	http.Handle(config.Server.Path, server.HTTP)
+	err = http.ListenAndServe(config.Server.Bind, nil)
+	if err != nil {
+		panic(err)
+	}
 }

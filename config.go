@@ -6,9 +6,10 @@ import "github.com/BurntSushi/toml"
 var configFile = "config.toml"
 
 type Config struct {
-	Server ServerConfig `toml:"server"`
-	BBS    BoardConfig  `toml:"bbs"`
-	DB     DBConfig     `toml:"database"`
+	Server    ServerConfig `toml:"server"`
+	BBS       BoardConfig  `toml:"bbs"`
+	DB        DBConfig     `toml:"database"`
+	WebClient WCConfig     `toml:"webclient"`
 }
 
 type ServerConfig struct {
@@ -24,6 +25,11 @@ type BoardConfig struct {
 type DBConfig struct {
 	Addr string
 	Name string
+}
+
+type WCConfig struct {
+	Index  string
+	Static string
 }
 
 func readConfig() Config {
