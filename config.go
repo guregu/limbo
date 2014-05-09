@@ -15,7 +15,7 @@ type Config struct {
 type ServerConfig struct {
 	Bind string
 	Path string
-	Ws   string
+	WS   string
 }
 
 type BoardConfig struct {

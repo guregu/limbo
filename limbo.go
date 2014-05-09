@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"code.google.com/p/go.crypto/bcrypt"
-	"code.google.com/p/go.net/websocket"
 	"github.com/guregu/bbs"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -221,7 +220,7 @@ func (client *limbo) IsLoggedIn() bool {
 }
 
 func (client *limbo) Hello() bbs.HelloMessage {
-	return bbs.HelloMessage{
+	msg := bbs.HelloMessage{
 		Command:         "hello",
 		Name:            config.BBS.Name,
 		ProtocolVersion: 0,
@@ -237,6 +236,11 @@ func (client *limbo) Hello() bbs.HelloMessage {
 		IconURL:       "/static/icon.png",
 		DefaultRange:  defaultRange,
 	}
+	if config.Server.WS != "" {
+		msg.Options = append(msg.Options, "realtime")
+		msg.RealtimeURL = "ws://" + config.Server.Bind + config.Server.WS
+	}
+	return msg
 }
 
 func New() bbs.BBS {
@@ -286,8 +290,8 @@ func main() {
 		log.Printf("\t/static/ \t%s", config.WebClient.Static)
 	}
 	http.Handle(config.Server.Path, server)
-	if config.Server.Ws != "" {
-		http.Handle(config.Server.Ws, websocket.Handler(server.ServeWebsocket))
+	if config.Server.WS != "" {
+		http.Handle(config.Server.WS, server.WS)
 	}
 	err = http.ListenAndServe(config.Server.Bind, nil)
 	if err != nil {
