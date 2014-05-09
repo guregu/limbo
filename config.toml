@@ -1,6 +1,7 @@
 [server]
 bind = ":8080"
 path = "/bbs"
+ws = "/ws"
 
 [bbs]
 name = "limbo test board"
@@ -11,5 +12,5 @@ addr = "localhost" # uses default mongodb port
 name = "limbo"
 
 [webclient]
-index = "/home/greg/code/bbs-client/index.html"
-static = "/home/greg/code/bbs-client/static"
+index = "/Users/greg/code/bbs-client/index.html"
+static = "/Users/greg/code/bbs-client/static"

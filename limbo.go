@@ -1,16 +1,20 @@
 package main
 
-import "fmt"
-import "time"
-import "log"
-import "strings"
-import "net/http"
-import "io/ioutil"
+import (
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"strings"
+	"time"
 
-import "code.google.com/p/go.crypto/bcrypt"
-import "labix.org/v2/mgo"
-import "labix.org/v2/mgo/bson"
-import "github.com/guregu/bbs"
+	"code.google.com/p/go.crypto/bcrypt"
+	"code.google.com/p/go.net/websocket"
+	"github.com/guregu/bbs"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
+)
 
 var db *mgo.Database
 var dbSession *mgo.Session
@@ -18,7 +22,7 @@ var config Config
 var server *bbs.Server
 
 var usernameLengthLimit = 32
-var defaultRange = &bbs.Range{1, 50}
+var defaultRange = bbs.Range{1, 50}
 var listThreadLimit = 50
 
 type limbo struct {
@@ -34,9 +38,9 @@ func validateUsername(username string) bool {
 	return true
 }
 
-func (client *limbo) Register(cmd *bbs.RegisterCommand) (wm *bbs.OKMessage, errm *bbs.ErrorMessage) {
+func (client *limbo) Register(cmd bbs.RegisterCommand) (wm bbs.OKMessage, err error) {
 	if !validateUsername(cmd.Username) {
-		return nil, bbs.Error("register", "Invalid username.")
+		return bbs.OKMessage{}, errors.New("Invalid username.")
 	}
 
 	// see if we have a user already
@@ -45,7 +49,7 @@ func (client *limbo) Register(cmd *bbs.RegisterCommand) (wm *bbs.OKMessage, errm
 		pw, crypt_err := bcrypt.GenerateFromPassword([]byte(cmd.Password), bcrypt.DefaultCost)
 		if crypt_err != nil {
 			// seems like bcrypt freaks out if the password is less than 3 characters
-			return nil, bbs.Error("register", "Password too short.")
+			return bbs.OKMessage{}, errors.New("Password too short.")
 		}
 
 		usr := User{
@@ -58,12 +62,12 @@ func (client *limbo) Register(cmd *bbs.RegisterCommand) (wm *bbs.OKMessage, errm
 		db.C("users").Insert(&usr)
 		return bbs.OK("register"), nil
 	} else {
-		return nil, bbs.Error("register", "Username is already taken.")
+		return bbs.OKMessage{}, errors.New("Username is already taken.")
 	}
 }
 
 // TODO: change bbs package so this can return an error message
-func (client *limbo) LogIn(cmd *bbs.LoginCommand) bool {
+func (client *limbo) LogIn(cmd bbs.LoginCommand) bool {
 	var user User
 	err := db.C("users").Find(bson.M{"name": cmd.Username}).One(&user)
 	if err != nil {
@@ -79,31 +83,31 @@ func (client *limbo) LogIn(cmd *bbs.LoginCommand) bool {
 	}
 }
 
-func (client *limbo) LogOut(cmd *bbs.LogoutCommand) *bbs.OKMessage {
+func (client *limbo) LogOut(cmd bbs.LogoutCommand) bbs.OKMessage {
 	client.user = nil
 	return bbs.OK("logout")
 }
 
-func (client *limbo) Get(cmd *bbs.GetCommand) (tm *bbs.ThreadMessage, errm *bbs.ErrorMessage) {
+func (client *limbo) Get(cmd bbs.GetCommand) (tm bbs.ThreadMessage, err error) {
 	if !bson.IsObjectIdHex(cmd.ThreadID) {
-		return nil, bbs.Error("get", "Invalid thread ID.")
+		return bbs.ThreadMessage{}, errors.New("Invalid thread ID.")
 	}
 
 	id := bson.ObjectIdHex(cmd.ThreadID)
 	var thread Thread
-	err := db.C("threads").FindId(id).One(&thread)
+	err = db.C("threads").FindId(id).One(&thread)
 	if err != nil {
-		return nil, bbs.Error("get", fmt.Sprintf("No such thread: %s", cmd.ThreadID))
+		return bbs.ThreadMessage{}, errors.New(fmt.Sprintf("No such thread: %s", cmd.ThreadID))
 	}
 
-	if cmd.Range == nil && cmd.Token != "" {
+	if cmd.Range == (bbs.Range{}) && cmd.Token != "" {
 		cmd.Range = thread.parseNextToken(cmd.Token)
 	}
 
 	return thread.toBBS(cmd.Range), nil
 }
 
-func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.ErrorMessage) {
+func (client *limbo) List(cmd bbs.ListCommand) (lm bbs.ListMessage, err error) {
 	var date = time.Now().Add(time.Second * 5)
 	if cmd.Token != "" {
 		d, err := time.Parse(time.RFC3339, cmd.Token)
@@ -130,7 +134,7 @@ func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.
 				"$nin": tags.exclude,
 			}}).Sort("-lastpost").Limit(listThreadLimit).All(&threads)
 	}
-	msg := &bbs.ListMessage{
+	msg := bbs.ListMessage{
 		Command: "list",
 		Type:    "thread",
 		Query:   cmd.Query,
@@ -143,23 +147,19 @@ func (client *limbo) List(cmd *bbs.ListCommand) (lm *bbs.ListMessage, errm *bbs.
 	return msg, nil
 }
 
-func (client *limbo) BoardList(cmd *bbs.ListCommand) (blm *bbs.BoardListMessage, errm *bbs.ErrorMessage) {
-	return nil, bbs.Error("list", "No boards!")
-}
-
-func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
+func (client *limbo) Reply(cmd bbs.ReplyCommand) (okm bbs.OKMessage, err error) {
 	if !bson.IsObjectIdHex(cmd.To) {
-		return nil, bbs.Error("reply", "Invalid thread ID.")
+		return bbs.OKMessage{}, errors.New("Invalid thread ID.")
 	}
 	id := bson.ObjectIdHex(cmd.To)
 	var thread Thread
-	err := db.C("threads").FindId(id).One(&thread)
+	err = db.C("threads").FindId(id).One(&thread)
 	if err != nil {
-		return nil, bbs.Error("reply", "No such thread.")
+		return bbs.OKMessage{}, errors.New("No such thread.")
 	}
 
 	if thread.Closed && !client.user.Admin {
-		return nil, bbs.Error("reply", "Can't reply to a closed thread.")
+		return bbs.OKMessage{}, errors.New("Can't reply to a closed thread.")
 	}
 
 	// TODO: deal with formatting
@@ -173,15 +173,15 @@ func (client *limbo) Reply(cmd *bbs.ReplyCommand) (okm *bbs.OKMessage, errm *bbs
 		"$push": bson.M{"posts": &post},
 		"$set":  bson.M{"lastpost": time.Now()}})
 	if err != nil {
-		return nil, bbs.Error("reply", "DB error: couldn't add reply.")
+		return bbs.OKMessage{}, errors.New("DB error: couldn't add reply.")
 	}
 
 	return bbs.OK("reply"), nil
 }
 
-func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.ErrorMessage) {
+func (client *limbo) Post(cmd bbs.PostCommand) (okm bbs.OKMessage, err error) {
 	if cmd.Title == "" {
-		return nil, bbs.Error("post", "Thread title can't be blank.")
+		return bbs.OKMessage{}, errors.New("Thread title can't be blank.")
 	}
 
 	// TODO: deal with formatting, tags
@@ -203,25 +203,21 @@ func (client *limbo) Post(cmd *bbs.PostCommand) (okm *bbs.OKMessage, errm *bbs.E
 		},
 	}
 
-	err := db.C("threads").Insert(&thread)
+	err = db.C("threads").Insert(&thread)
 	if err == nil {
-		return &bbs.OKMessage{
+		return bbs.OKMessage{
 			Command: "ok",
 			ReplyTo: "post",
 			Result:  id.Hex(),
 		}, nil
 	} else {
 		log.Printf("New thread err: %s\n", err.Error())
-		return nil, bbs.Error("post", "Couldn't post.")
+		return bbs.OKMessage{}, errors.New("Couldn't post.")
 	}
 }
 
 func (client *limbo) IsLoggedIn() bool {
 	return client.user != nil
-}
-
-func (client *limbo) BookmarkList(m *bbs.ListCommand) (bmm *bbs.BookmarkListMessage, errm *bbs.ErrorMessage) {
-	return nil, bbs.Error("list", "No bookmarks")
 }
 
 func (client *limbo) Hello() bbs.HelloMessage {
@@ -289,7 +285,10 @@ func main() {
 		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(config.WebClient.Static))))
 		log.Printf("\t/static/ \t%s", config.WebClient.Static)
 	}
-	http.Handle(config.Server.Path, server.HTTP)
+	http.Handle(config.Server.Path, server)
+	if config.Server.Ws != "" {
+		http.Handle(config.Server.Ws, websocket.Handler(server.ServeWebsocket))
+	}
 	err = http.ListenAndServe(config.Server.Bind, nil)
 	if err != nil {
 		panic(err)
