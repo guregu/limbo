@@ -1,11 +1,14 @@
 package main
 
-import "fmt"
-import "time"
-import "strings"
-import "strconv"
-import "labix.org/v2/mgo/bson"
-import "github.com/guregu/bbs"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/guregu/bbs"
+	"gopkg.in/mgo.v2/bson"
+)
 
 type User struct {
 	ID       string `bson:"_id"` // username lower-cased

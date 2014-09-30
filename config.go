@@ -1,7 +1,10 @@
 package main
 
-import "log"
-import "github.com/BurntSushi/toml"
+import (
+	"log"
+
+	"github.com/BurntSushi/toml"
+)
 
 var configFile = "config.toml"
 

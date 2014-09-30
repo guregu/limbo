@@ -11,8 +11,8 @@ import (
 
 	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/guregu/bbs"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var db *mgo.Database

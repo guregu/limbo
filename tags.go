@@ -1,8 +1,11 @@
 package main
 
-import "labix.org/v2/mgo/bson"
-import "fmt"
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"gopkg.in/mgo.v2/bson"
+)
 
 type Tag struct {
 	ID       string `bson:"_id"` //name lowercased
