@@ -12,5 +12,4 @@ addr = "localhost" # uses default mongodb port
 name = "limbo"
 
 [webclient]
-index = "/Users/greg/code/bbs-client/index.html"
-static = "/Users/greg/code/bbs-client/static"
+index = "/Users/greg/code/flux/examples/flux-chat/"

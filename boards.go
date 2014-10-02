@@ -128,7 +128,7 @@ func (thread Thread) parseNextToken(token string) bbs.Range {
 type Threads []*Thread
 
 func (threads Threads) listing() []bbs.ThreadListing {
-	var list []bbs.ThreadListing
+	list := make([]bbs.ThreadListing, 0, len(threads))
 	for _, t := range threads {
 		list = append(list, t.listing())
 	}
