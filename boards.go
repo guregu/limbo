@@ -33,9 +33,9 @@ type Thread struct {
 func (thread Thread) toBBS(r bbs.Range) bbs.ThreadMessage {
 	if r.End == 0 {
 		r = defaultRange
-		if r.End > len(thread.Posts) {
-			r.End = len(thread.Posts)
-		}
+	}
+	if r.End > len(thread.Posts) {
+		r.End = len(thread.Posts)
 	}
 	msg := bbs.ThreadMessage{
 		Command:  "msg",
